@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<properties>
+    <property id="RpcUrl" type="string">https://api.mainnet-beta.solana.com</property>
+    <property id="RefreshMinutes" type="number">15</property>
+    <!-- 11163135 = 0xAA55FF, the nearest 64-colour palette entry to Solana purple 0x9945FF. -->
+    <property id="AccentColor" type="number">11163135</property>
+</properties>

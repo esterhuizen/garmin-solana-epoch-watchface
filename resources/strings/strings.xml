@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="AppName">Solana Epoch</string>
+
+    <!-- Settings -->
+    <string id="SettingRpcUrlTitle">Solana RPC endpoint</string>
+    <string id="SettingRpcUrlPrompt">JSON-RPC URL polled for getEpochInfo. Defaults to mainnet-beta.</string>
+    <string id="SettingRefreshMinutesTitle">Refresh interval (minutes)</string>
+    <string id="SettingRefreshMinutesPrompt">How often the background service polls. Minimum 5.</string>
+    <string id="SettingRefreshMinutesError">Enter a whole number of minutes between 5 and 240.</string>
+    <string id="SettingAccentColorTitle">Accent colour</string>
+    <string id="SettingAccentColorPrompt">Colour of the epoch progress arc and the epoch label.</string>
+    <string id="AccentPurple">Solana purple</string>
+    <string id="AccentGreen">Solana green</string>
+    <string id="AccentOrange">Orange</string>
+    <string id="AccentBlue">Blue</string>
+</strings>

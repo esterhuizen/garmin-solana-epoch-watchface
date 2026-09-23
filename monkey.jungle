@@ -1,0 +1,3 @@
+# Single build configuration: the layout is derived from dc.getWidth()/getHeight()
+# at runtime, so no per-device resource overrides are needed.
+project.manifest = manifest.xml

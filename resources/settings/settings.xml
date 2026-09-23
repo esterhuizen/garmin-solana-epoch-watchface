@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<settings>
+    <setting propertyKey="@Properties.RpcUrl" title="@Strings.SettingRpcUrlTitle"
+             prompt="@Strings.SettingRpcUrlPrompt">
+        <settingConfig type="alphaNumeric" maxLength="128" required="true" />
+    </setting>
+
+    <!-- Also clamped to >= 5 in code: anything less throws
+         Background.InvalidBackgroundTimeException at registration time. -->
+    <setting propertyKey="@Properties.RefreshMinutes" title="@Strings.SettingRefreshMinutesTitle"
+             prompt="@Strings.SettingRefreshMinutesPrompt">
+        <settingConfig type="numeric" min="5" max="240" required="true"
+                       errorMessage="@Strings.SettingRefreshMinutesError" />
+    </setting>
+
+    <!-- Decimal values, because the settings editor stores this as a plain number.
+         11163135 = 0xAA55FF, 65450 = 0x00FFAA, 16755200 = 0xFFAA00, 43775 = 0x00AAFF.
+         All four are exact entries of the fenix 6 64-colour palette. -->
+    <setting propertyKey="@Properties.AccentColor" title="@Strings.SettingAccentColorTitle"
+             prompt="@Strings.SettingAccentColorPrompt">
+        <settingConfig type="list">
+            <listEntry value="11163135">@Strings.AccentPurple</listEntry>
+            <listEntry value="65450">@Strings.AccentGreen</listEntry>
+            <listEntry value="16755200">@Strings.AccentOrange</listEntry>
+            <listEntry value="43775">@Strings.AccentBlue</listEntry>
+        </settingConfig>
+    </setting>
+</settings>
