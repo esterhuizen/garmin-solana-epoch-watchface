@@ -94,32 +94,13 @@ def draw_row(draw, centre_x, y_centre, font, height, text, colour):
     draw.text((centre_x, top), text, font=font, fill=colour, anchor="ma")
 
 
-def solana_mark(draw, cx, cy, w, colour):
-    """Mirror of SolanaEpochView.drawSolanaMark."""
-    h = (w * 7) // 10
-    bar = max(3, h // 4)
-    gap = max(3, h // 6)
-    shear = w // 6
-    left = cx - w // 2
-    top = cy - h // 2
-
-    def bar_poly(pts):
-        draw.polygon(pts, fill=colour)
-
-    bar_poly([
-        (left + shear, top), (left + w, top),
-        (left + w - shear, top + bar), (left, top + bar),
-    ])
-    mid = top + bar + gap
-    bar_poly([
-        (left + shear // 2, mid), (left + w - shear // 2, mid),
-        (left + w - shear, mid + bar), (left, mid + bar),
-    ])
-    bot = mid + bar + gap
-    bar_poly([
-        (left, bot), (left + w - shear, bot),
-        (left + w, bot + bar), (left + shear, bot + bar),
-    ])
+def paste_mark(image, cx, cy, day):
+    """Official logomark bitmap, black on day / white at night."""
+    name = "solana_mark_black.png" if day else "solana_mark_white.png"
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "resources", "drawables", name)
+    mark = Image.open(path).convert("RGBA")
+    image.paste(mark, (cx - mark.width // 2, cy - mark.height // 2), mark)
 
 
 def palette_for(day):
@@ -166,8 +147,7 @@ def render(device, state):
     small, small_px = fonts["small"]
     clock_font, clock_px = fonts["numberMedium"]
 
-    logo_w = max(22, width // 8)
-    solana_mark(draw, centre_x, centre_y - int(height * 0.36), logo_w, pal["primary"])
+    paste_mark(image, centre_x, centre_y - int(height * 0.36), state.get("day", True))
 
     draw_row(draw, centre_x, centre_y - int(height * 0.28), xtiny, xtiny_px,
              state["date"], pal["secondary"])

@@ -44,15 +44,19 @@ class SolanaEpochView extends WatchUi.WatchFace {
     private var _slotSecs as Float = $.Se.DEFAULT_SLOT_SECS;
     private var _haveError as Boolean = false;
     private var _errCode as Number = 0;
+    private var _markBlack as BitmapResource?;
+    private var _markWhite as BitmapResource?;
 
     //! Constructor
     public function initialize() {
         WatchFace.initialize();
     }
 
-    //! Handle layout. Nothing to cache: the layout is derived per draw from the Dc.
+    //! Handle layout. Load the official Solana logomark bitmaps once.
     //! @param dc The drawing context
     public function onLayout(dc as Dc) as Void {
+        _markBlack = WatchUi.loadResource(Rez.Drawables.SolanaMarkBlack) as BitmapResource;
+        _markWhite = WatchUi.loadResource(Rez.Drawables.SolanaMarkWhite) as BitmapResource;
     }
 
     //! Called when the face becomes visible.
@@ -133,8 +137,6 @@ class SolanaEpochView extends WatchUi.WatchFace {
         var secondary = day ? $.Se.COLOR_DAY_SECONDARY : $.Se.COLOR_SECONDARY;
         var track = day ? $.Se.COLOR_DAY_TRACK : $.Se.COLOR_TRACK;
         var warning = day ? $.Se.COLOR_DAY_WARNING : $.Se.COLOR_WARNING;
-        // Black mark on the light field, white mark on the dark field.
-        var logo = primary;
 
         // ---- Estimated position in the epoch --------------------------------------
         var progress = 0.0;
@@ -199,11 +201,14 @@ class SolanaEpochView extends WatchUi.WatchFace {
         // Everything below the clock is stacked downward from the measured bottom of
         // the clock row, so no assumed font metric can overlap two rows. HR and steps
         // occupy the spare lower third as a two-column row.
-        var logoW = width / 8;
-        if (logoW < 22) {
-            logoW = 22;
+        var mark = day ? _markBlack : _markWhite;
+        if (mark != null) {
+            var bitmap = mark as BitmapResource;
+            dc.drawBitmap(
+                centreX - bitmap.getWidth() / 2,
+                centreY - (height * 0.36).toNumber() - bitmap.getHeight() / 2,
+                bitmap);
         }
-        drawSolanaMark(dc, centreX, centreY - (height * 0.36).toNumber(), logoW, logo);
 
         drawRow(dc, centreX, centreY - (height * 0.28).toNumber(),
             Graphics.FONT_XTINY, dateString(clockInfo), secondary);
@@ -310,48 +315,6 @@ class SolanaEpochView extends WatchUi.WatchFace {
             return steps.format("%d");
         }
         return "0";
-    }
-
-    //! Draw the three-bar Solana mark, sheared, centred on (cx, cy).
-    //! Black on the day field, white at night - never a white mark on white.
-    //! @param dc The drawing context
-    //! @param cx Horizontal centre
-    //! @param cy Vertical centre
-    //! @param w Total width of the mark
-    //! @param color Foreground colour
-    private function drawSolanaMark(dc as Dc, cx as Number, cy as Number, w as Number,
-            color as ColorType) as Void {
-        var h = (w * 7) / 10;
-        var bar = h / 4;
-        if (bar < 3) {
-            bar = 3;
-        }
-        var gapBar = h / 6;
-        if (gapBar < 3) {
-            gapBar = 3;
-        }
-        var shear = w / 6;
-        var left = cx - w / 2;
-        var top = cy - h / 2;
-
-        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        fillBar(dc, left + shear, top, left + w, top, left + w - shear, top + bar, left, top + bar);
-        var mid = top + bar + gapBar;
-        fillBar(dc, left + shear / 2, mid, left + w - shear / 2, mid,
-            left + w - shear, mid + bar, left, mid + bar);
-        var bot = mid + bar + gapBar;
-        fillBar(dc, left, bot, left + w - shear, bot, left + w, bot + bar, left + shear, bot + bar);
-    }
-
-    //! One parallelogram for the Solana mark. Eight scalars rather than a nested
-    //! Array literal so the 9.2.0 type checker does not run out of heap at -l 3.
-    private function fillBar(dc as Dc, x1 as Number, y1 as Number, x2 as Number, y2 as Number,
-            x3 as Number, y3 as Number, x4 as Number, y4 as Number) as Void {
-        var p1 = [x1, y1];
-        var p2 = [x2, y2];
-        var p3 = [x3, y3];
-        var p4 = [x4, y4];
-        dc.fillPolygon([p1, p2, p3, p4]);
     }
 
     //! Draw one centre-justified row of text.

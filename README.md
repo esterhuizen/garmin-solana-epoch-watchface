@@ -22,7 +22,7 @@ Solana mainnet-beta epoch the network is, and how long is left.
 ```
 
 - **Ring** - epoch progress. Full circle = epoch complete. Pen width is `max(6, w/28)`.
-- **Day / night** - local hour 07:00-18:59 is a white MIP field (readable outdoors). After 19:00 the original black field returns. The Solana mark follows: black on white, white on black.
+- **Day / night** - local hour 07:00-18:59 is a white MIP field (readable outdoors). After 19:00 the original black field returns. The Solana logomark is the official asset from [solana.com/branding](https://solana.com/branding): black on white, white on black.
 - **HR** - `Activity.getActivityInfo().currentHeartRate`, falling back to the newest `SensorHistory` sample. `--` until a sample exists.
 - **Steps** - `ActivityMonitor.getInfo().steps` for today. `Nk` above 100000.
 - **Countdown** — adaptive: `Xd Yh left` above a day, `Xh Ym left` above an hour, `Ym left`

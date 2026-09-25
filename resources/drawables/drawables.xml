@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <drawables>
     <bitmap id="LauncherIcon" filename="launcher_icon.png" />
+    <!-- Official Solana logomark from solana.com/branding, 32x28, 1-bit. -->
+    <bitmap id="SolanaMarkBlack" filename="solana_mark_black.png" />
+    <bitmap id="SolanaMarkWhite" filename="solana_mark_white.png" />
 </drawables>
