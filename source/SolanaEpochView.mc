@@ -26,6 +26,7 @@ import Toybox.System;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
 import Toybox.WatchUi;
+import Toybox.Weather;
 
 class SolanaEpochView extends WatchUi.WatchFace {
 
@@ -217,7 +218,7 @@ class SolanaEpochView extends WatchUi.WatchFace {
         // FONT_NUMBER_* glyph boxes are reported to carry more padding above the ascent
         // than getFontHeight() implies, so the digits may sit visibly low inside the row.
         // If they do, nudge this fraction up; the stack below follows automatically.
-        var clockCentre = centreY - (height * 0.12).toNumber();
+        var clockCentre = centreY - (height * 0.14).toNumber();
         var clockHeight = Graphics.getFontHeight(Graphics.FONT_NUMBER_MEDIUM);
         drawRow(dc, centreX, clockCentre, Graphics.FONT_NUMBER_MEDIUM,
             timeString(clockInfo), primary);
@@ -259,19 +260,22 @@ class SolanaEpochView extends WatchUi.WatchFace {
         var statusHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
         drawRow(dc, centreX, rowTop + statusHeight / 2, Graphics.FONT_XTINY,
             status, statusColor);
-        rowTop += statusHeight + gap * 2;
 
-        // ---- HR / steps -----------------------------------------------------------
+        // ---- HR / weather / steps -------------------------------------------------
+        // Pinned to a screen fraction, not stacked off the clock. On a 280 round the
+        // old 0.28*width columns at the bottom of the stack sat on the bezel.
+        var statsY = centreY + (height * 0.29).toNumber();
+        var statsXOff = (width * 0.22).toNumber();
         var labelHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
-        var valueHeight = Graphics.getFontHeight(Graphics.FONT_TINY);
-        var statsXOff = (width * 0.28).toNumber();
-        var labelY = rowTop + labelHeight / 2;
-        var valueY = rowTop + labelHeight + gap / 2 + valueHeight / 2;
+        var valueHeight = Graphics.getFontHeight(Graphics.FONT_SMALL);
+        var labelY = statsY - valueHeight / 2 - gap / 2 - labelHeight / 2;
 
         drawRow(dc, centreX - statsXOff, labelY, Graphics.FONT_XTINY, "HR", secondary);
-        drawRow(dc, centreX - statsXOff, valueY, Graphics.FONT_TINY, heartRateText(), primary);
+        drawRow(dc, centreX - statsXOff, statsY, Graphics.FONT_SMALL, heartRateText(), primary);
+        drawRow(dc, centreX, labelY, Graphics.FONT_XTINY, "WX", secondary);
+        drawRow(dc, centreX, statsY, Graphics.FONT_SMALL, weatherText(), primary);
         drawRow(dc, centreX + statsXOff, labelY, Graphics.FONT_XTINY, "STEPS", secondary);
-        drawRow(dc, centreX + statsXOff, valueY, Graphics.FONT_TINY, stepCountText(), primary);
+        drawRow(dc, centreX + statsXOff, statsY, Graphics.FONT_SMALL, stepCountText(), primary);
     }
 
     //! Daytime is 07:00-18:59 local. MIP does not emit light, so the white field is for
@@ -315,6 +319,23 @@ class SolanaEpochView extends WatchUi.WatchFace {
             return steps.format("%d");
         }
         return "0";
+    }
+
+    //! Current temperature from Garmin Connect weather, in the watch's C/F setting.
+    //! @return e.g. "18C" / "64F", or "--" when the phone has not delivered weather
+    private function weatherText() as String {
+        if (!((Toybox has :Weather) && (Weather has :getCurrentConditions))) {
+            return "--";
+        }
+        var cond = Weather.getCurrentConditions();
+        if (cond == null || cond.temperature == null) {
+            return "--";
+        }
+        var celsius = (cond.temperature as Number);
+        if (System.getDeviceSettings().temperatureUnits == System.UNIT_STATUTE) {
+            return ((celsius * 9) / 5 + 32).format("%d") + "F";
+        }
+        return celsius.format("%d") + "C";
     }
 
     //! Draw one centre-justified row of text.
