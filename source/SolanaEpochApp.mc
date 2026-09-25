@@ -83,11 +83,20 @@ module Se {
     // ---- Palette ------------------------------------------------------------------
     // Every value is an exact entry of the fenix 6 64-colour palette (components drawn
     // from 00/55/AA/FF) so nothing dithers on the MIP display.
+    // Night (19:00-07:00): black field, white type.
     const COLOR_BG = 0x000000;
     const COLOR_PRIMARY = 0xFFFFFF;
     const COLOR_SECONDARY = 0xAAAAAA;
     const COLOR_TRACK = 0x555555;
     const COLOR_WARNING = 0xFFAA00;
+    // Day (07:00-19:00): white field, black type. MIP is reflective, so a light
+    // face is the one that stays readable outdoors. Warning is 0xFF5500 rather
+    // than 0xFFAA00 so it still reads on white.
+    const COLOR_DAY_BG = 0xFFFFFF;
+    const COLOR_DAY_PRIMARY = 0x000000;
+    const COLOR_DAY_SECONDARY = 0x555555;
+    const COLOR_DAY_TRACK = 0xAAAAAA;
+    const COLOR_DAY_WARNING = 0xFF5500;
     // Nearest palette entry to Solana purple 0x9945FF.
     const DEFAULT_ACCENT = 0xAA55FF;
 

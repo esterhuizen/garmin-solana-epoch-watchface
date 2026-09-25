@@ -5,6 +5,10 @@
 //! the lower three rows are stacked from measured font heights rather than screen
 //! fractions, so no assumed font metric can make two rows collide.
 //!
+//! Day (07:00-19:00) is a white field with black type and a black Solana mark, because
+//! MIP is reflective and a light face is the one that stays readable outdoors. Night
+//! keeps the original black field. HR and steps sit in the spare lower third.
+//!
 //! There is no onPartialUpdate(). The countdown only needs minute resolution, onUpdate()
 //! already runs at the top of every minute in low-power mode on this always-on MIP
 //! display, and not implementing it removes the whole per-second power-budget risk.
@@ -12,9 +16,12 @@
 //! Storage and Properties are read once into the cache below, not once per draw:
 //! onUpdate() runs about once a second for ten seconds after every wrist raise.
 
+import Toybox.Activity;
+import Toybox.ActivityMonitor;
 import Toybox.Application.Storage;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.SensorHistory;
 import Toybox.System;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
@@ -119,6 +126,15 @@ class SolanaEpochView extends WatchUi.WatchFace {
         }
 
         var nowTs = Time.now().value();
+        var clockInfo = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
+        var day = isDaytime(clockInfo);
+        var bg = day ? $.Se.COLOR_DAY_BG : $.Se.COLOR_BG;
+        var primary = day ? $.Se.COLOR_DAY_PRIMARY : $.Se.COLOR_PRIMARY;
+        var secondary = day ? $.Se.COLOR_DAY_SECONDARY : $.Se.COLOR_SECONDARY;
+        var track = day ? $.Se.COLOR_DAY_TRACK : $.Se.COLOR_TRACK;
+        var warning = day ? $.Se.COLOR_DAY_WARNING : $.Se.COLOR_WARNING;
+        // Black mark on the light field, white mark on the dark field.
+        var logo = primary;
 
         // ---- Estimated position in the epoch --------------------------------------
         var progress = 0.0;
@@ -152,10 +168,10 @@ class SolanaEpochView extends WatchUi.WatchFace {
         }
 
         // ---- Ring -----------------------------------------------------------------
-        dc.setColor($.Se.COLOR_BG, $.Se.COLOR_BG);
+        dc.setColor(bg, bg);
         dc.clear();
         dc.setPenWidth(penWidth);
-        dc.setColor($.Se.COLOR_TRACK, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(track, Graphics.COLOR_TRANSPARENT);
         dc.drawCircle(centreX, centreY, radius);
         // drawArc() truncates every parameter towards zero, so round the sweep here
         // (+ 0.5) instead of losing up to a whole degree on every draw.
@@ -179,22 +195,27 @@ class SolanaEpochView extends WatchUi.WatchFace {
         dc.setPenWidth(1);
 
         // ---- Text stack -----------------------------------------------------------
-        // The date and clock rows stay anchored to screen fractions. Everything below
-        // the clock is stacked downward from the measured bottom of the clock row, so no
-        // assumed font metric can overlap two rows.
-        var clockInfo = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
+        // Logo sits above the date. Date and clock stay anchored to screen fractions.
+        // Everything below the clock is stacked downward from the measured bottom of
+        // the clock row, so no assumed font metric can overlap two rows. HR and steps
+        // occupy the spare lower third as a two-column row.
+        var logoW = width / 8;
+        if (logoW < 22) {
+            logoW = 22;
+        }
+        drawSolanaMark(dc, centreX, centreY - (height * 0.36).toNumber(), logoW, logo);
 
-        drawRow(dc, centreX, centreY - (height * 0.27).toNumber(),
-            Graphics.FONT_XTINY, dateString(clockInfo), $.Se.COLOR_SECONDARY);
+        drawRow(dc, centreX, centreY - (height * 0.28).toNumber(),
+            Graphics.FONT_XTINY, dateString(clockInfo), secondary);
 
         // FIRST THING TO CHECK ON REAL HARDWARE: the clock's vertical placement.
         // FONT_NUMBER_* glyph boxes are reported to carry more padding above the ascent
         // than getFontHeight() implies, so the digits may sit visibly low inside the row.
         // If they do, nudge this fraction up; the stack below follows automatically.
-        var clockCentre = centreY - (height * 0.09).toNumber();
+        var clockCentre = centreY - (height * 0.12).toNumber();
         var clockHeight = Graphics.getFontHeight(Graphics.FONT_NUMBER_MEDIUM);
         drawRow(dc, centreX, clockCentre, Graphics.FONT_NUMBER_MEDIUM,
-            timeString(clockInfo), $.Se.COLOR_PRIMARY);
+            timeString(clockInfo), primary);
 
         var rowTop = clockCentre + clockHeight / 2 + gap;
 
@@ -209,23 +230,23 @@ class SolanaEpochView extends WatchUi.WatchFace {
         }
         var countdownHeight = Graphics.getFontHeight(Graphics.FONT_TINY);
         drawRow(dc, centreX, rowTop + countdownHeight / 2, Graphics.FONT_TINY,
-            countdown, $.Se.COLOR_PRIMARY);
+            countdown, primary);
         rowTop += countdownHeight + gap;
 
         // ---- Status line ----------------------------------------------------------
         var status = "--";
-        var statusColor = $.Se.COLOR_SECONDARY;
+        var statusColor = secondary;
         if (_haveError) {
             // Shown verbatim: a JSON-RPC error.code (-32768..-32000), a Connect IQ
             // transport code, an HTTP status, or 1 for an unusable body.
             status = "RPC " + _errCode.format("%d");
-            statusColor = $.Se.COLOR_WARNING;
+            statusColor = warning;
         } else if (_haveData) {
             status = (progress * 100.0).format("%.1f") + "%";
         }
         if (_haveData && elapsed > 3 * _refreshSecs) {
             status += " !";
-            statusColor = $.Se.COLOR_WARNING;
+            statusColor = warning;
         }
         if (!System.getDeviceSettings().phoneConnected) {
             status += " x";
@@ -233,6 +254,104 @@ class SolanaEpochView extends WatchUi.WatchFace {
         var statusHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
         drawRow(dc, centreX, rowTop + statusHeight / 2, Graphics.FONT_XTINY,
             status, statusColor);
+        rowTop += statusHeight + gap * 2;
+
+        // ---- HR / steps -----------------------------------------------------------
+        var labelHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
+        var valueHeight = Graphics.getFontHeight(Graphics.FONT_TINY);
+        var statsXOff = (width * 0.28).toNumber();
+        var labelY = rowTop + labelHeight / 2;
+        var valueY = rowTop + labelHeight + gap / 2 + valueHeight / 2;
+
+        drawRow(dc, centreX - statsXOff, labelY, Graphics.FONT_XTINY, "HR", secondary);
+        drawRow(dc, centreX - statsXOff, valueY, Graphics.FONT_TINY, heartRateText(), primary);
+        drawRow(dc, centreX + statsXOff, labelY, Graphics.FONT_XTINY, "STEPS", secondary);
+        drawRow(dc, centreX + statsXOff, valueY, Graphics.FONT_TINY, stepCountText(), primary);
+    }
+
+    //! Daytime is 07:00-18:59 local. MIP does not emit light, so the white field is for
+    //! outdoor contrast, not a flashlight; after 19:00 the original black field returns.
+    //! @param info Gregorian info for the current minute
+    //! @return true when the light palette should be used
+    private function isDaytime(info as Gregorian.Info) as Boolean {
+        var hour = info.hour;
+        return hour >= 7 && hour < 19;
+    }
+
+    //! Latest heart rate, or "--" when the sensor has not produced a sample yet.
+    //! Prefers the live Activity value, then the most recent SensorHistory sample.
+    //! @return A digits-only string, or "--"
+    private function heartRateText() as String {
+        var activity = Activity.getActivityInfo();
+        if (activity != null && activity.currentHeartRate != null) {
+            return (activity.currentHeartRate as Number).format("%d");
+        }
+        if ((Toybox has :SensorHistory) && (SensorHistory has :getHeartRateHistory)) {
+            var iter = SensorHistory.getHeartRateHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST});
+            if (iter != null) {
+                var sample = iter.next();
+                if (sample != null && sample.data != null) {
+                    return (sample.data as Number).format("%d");
+                }
+            }
+        }
+        return "--";
+    }
+
+    //! Today's step count from ActivityMonitor.
+    //! @return A digits-only string, "0" before the first step
+    private function stepCountText() as String {
+        var info = ActivityMonitor.getInfo();
+        if (info != null && info.steps != null) {
+            var steps = info.steps as Number;
+            if (steps >= 100000) {
+                return (steps / 1000).format("%d") + "k";
+            }
+            return steps.format("%d");
+        }
+        return "0";
+    }
+
+    //! Draw the three-bar Solana mark, sheared, centred on (cx, cy).
+    //! Black on the day field, white at night - never a white mark on white.
+    //! @param dc The drawing context
+    //! @param cx Horizontal centre
+    //! @param cy Vertical centre
+    //! @param w Total width of the mark
+    //! @param color Foreground colour
+    private function drawSolanaMark(dc as Dc, cx as Number, cy as Number, w as Number,
+            color as ColorType) as Void {
+        var h = (w * 7) / 10;
+        var bar = h / 4;
+        if (bar < 3) {
+            bar = 3;
+        }
+        var gapBar = h / 6;
+        if (gapBar < 3) {
+            gapBar = 3;
+        }
+        var shear = w / 6;
+        var left = cx - w / 2;
+        var top = cy - h / 2;
+
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        fillBar(dc, left + shear, top, left + w, top, left + w - shear, top + bar, left, top + bar);
+        var mid = top + bar + gapBar;
+        fillBar(dc, left + shear / 2, mid, left + w - shear / 2, mid,
+            left + w - shear, mid + bar, left, mid + bar);
+        var bot = mid + bar + gapBar;
+        fillBar(dc, left, bot, left + w - shear, bot, left + w, bot + bar, left + shear, bot + bar);
+    }
+
+    //! One parallelogram for the Solana mark. Eight scalars rather than a nested
+    //! Array literal so the 9.2.0 type checker does not run out of heap at -l 3.
+    private function fillBar(dc as Dc, x1 as Number, y1 as Number, x2 as Number, y2 as Number,
+            x3 as Number, y3 as Number, x4 as Number, y4 as Number) as Void {
+        var p1 = [x1, y1];
+        var p2 = [x2, y2];
+        var p3 = [x3, y3];
+        var p4 = [x4, y4];
+        dc.fillPolygon([p1, p2, p3, p4]);
     }
 
     //! Draw one centre-justified row of text.

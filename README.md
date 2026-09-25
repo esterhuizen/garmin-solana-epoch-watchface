@@ -7,17 +7,24 @@ Solana mainnet-beta epoch the network is, and how long is left.
 
 ```
               ╭──────────────╮
-             ╱   THU 18 SEP   ╲        date, FONT_XTINY, grey
-            │      14:32       │       time, FONT_NUMBER_MEDIUM, white
+             ╱   [solana mark] ╲       black on day, white at night
+            │    THU 18 SEP    │       date, FONT_XTINY, secondary
+            │      14:32       │       time, FONT_NUMBER_MEDIUM, primary
             │   EPOCH 1036     │       epoch number, FONT_SMALL, accent
-            │   2h 14m left    │       countdown, FONT_TINY, white
-             ╲    94.1%       ╱        progress + status, FONT_XTINY, grey
+            │   2h 14m left    │       countdown, FONT_TINY, primary
+            │     94.1%        │       progress + status, FONT_XTINY
+            │  HR 72   8432    │       heart rate and steps, FONT_TINY
+             ╲                ╱
               ╰──────────────╯
-        outer ring: dark-grey track with an accent
-        arc sweeping clockwise from 12 o'clock
+        outer ring: track with an accent arc from 12 o'clock
+        day (07:00-19:00): white field, black type, black logo
+        night: black field, white type, white logo
 ```
 
-- **Ring** — epoch progress. Full circle = epoch complete. Pen width is `max(6, w/28)`.
+- **Ring** - epoch progress. Full circle = epoch complete. Pen width is `max(6, w/28)`.
+- **Day / night** - local hour 07:00-18:59 is a white MIP field (readable outdoors). After 19:00 the original black field returns. The Solana mark follows: black on white, white on black.
+- **HR** - `Activity.getActivityInfo().currentHeartRate`, falling back to the newest `SensorHistory` sample. `--` until a sample exists.
+- **Steps** - `ActivityMonitor.getInfo().steps` for today. `Nk` above 100000.
 - **Countdown** — adaptive: `Xd Yh left` above a day, `Xh Ym left` above an hour, `Ym left`
   above a minute, and `<1m left` below that (never `0m left`). Shows `rollover` once the
   estimate runs past the end of the epoch, because at that point the real epoch has almost
