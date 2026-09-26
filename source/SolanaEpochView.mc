@@ -207,18 +207,18 @@ class SolanaEpochView extends WatchUi.WatchFace {
             var bitmap = mark as BitmapResource;
             dc.drawBitmap(
                 centreX - bitmap.getWidth() / 2,
-                centreY - (height * 0.36).toNumber() - bitmap.getHeight() / 2,
+                centreY - (height * 0.40).toNumber() - bitmap.getHeight() / 2,
                 bitmap);
         }
 
-        drawRow(dc, centreX, centreY - (height * 0.28).toNumber(),
+        drawRow(dc, centreX, centreY - (height * 0.30).toNumber(),
             Graphics.FONT_XTINY, dateString(clockInfo), secondary);
 
         // FIRST THING TO CHECK ON REAL HARDWARE: the clock's vertical placement.
         // FONT_NUMBER_* glyph boxes are reported to carry more padding above the ascent
         // than getFontHeight() implies, so the digits may sit visibly low inside the row.
         // If they do, nudge this fraction up; the stack below follows automatically.
-        var clockCentre = centreY - (height * 0.14).toNumber();
+        var clockCentre = centreY - (height * 0.16).toNumber();
         var clockHeight = Graphics.getFontHeight(Graphics.FONT_NUMBER_MEDIUM);
         drawRow(dc, centreX, clockCentre, Graphics.FONT_NUMBER_MEDIUM,
             timeString(clockInfo), primary);
@@ -260,21 +260,17 @@ class SolanaEpochView extends WatchUi.WatchFace {
         var statusHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
         drawRow(dc, centreX, rowTop + statusHeight / 2, Graphics.FONT_XTINY,
             status, statusColor);
+        rowTop += statusHeight + gap * 2;
 
         // ---- HR / weather / steps -------------------------------------------------
-        // Pinned to a screen fraction, not stacked off the clock. On a 280 round the
-        // old 0.28*width columns at the bottom of the stack sat on the bezel.
-        var statsY = centreY + (height * 0.29).toNumber();
-        var statsXOff = (width * 0.22).toNumber();
-        var labelHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
+        // One row, stacked under status (not a second independent Y). Values only:
+        // labels on a 280 round collided with the % line. x-offset 0.20 stays inside
+        // the inner ring (the old 0.28 columns clipped on the Enduro bezel).
         var valueHeight = Graphics.getFontHeight(Graphics.FONT_SMALL);
-        var labelY = statsY - valueHeight / 2 - gap / 2 - labelHeight / 2;
-
-        drawRow(dc, centreX - statsXOff, labelY, Graphics.FONT_XTINY, "HR", secondary);
+        var statsY = rowTop + valueHeight / 2;
+        var statsXOff = (width * 0.20).toNumber();
         drawRow(dc, centreX - statsXOff, statsY, Graphics.FONT_SMALL, heartRateText(), primary);
-        drawRow(dc, centreX, labelY, Graphics.FONT_XTINY, "WX", secondary);
         drawRow(dc, centreX, statsY, Graphics.FONT_SMALL, weatherText(), primary);
-        drawRow(dc, centreX + statsXOff, labelY, Graphics.FONT_XTINY, "STEPS", secondary);
         drawRow(dc, centreX + statsXOff, statsY, Graphics.FONT_SMALL, stepCountText(), primary);
     }
 
