@@ -4,4 +4,8 @@
     <!-- Official Solana logomark from solana.com/branding, 32x28, 1-bit. -->
     <bitmap id="SolanaMarkBlack" filename="solana_mark_black.png" />
     <bitmap id="SolanaMarkWhite" filename="solana_mark_white.png" />
+    <bitmap id="HeartBlack" filename="heart_black.png" />
+    <bitmap id="HeartWhite" filename="heart_white.png" />
+    <bitmap id="ShoeBlack" filename="shoe_black.png" />
+    <bitmap id="ShoeWhite" filename="shoe_white.png" />
 </drawables>

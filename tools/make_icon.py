@@ -78,9 +78,64 @@ def write_mark(ink, name):
     print("wrote {} ({}x{})".format(path, MARK_W, MARK_H))
 
 
+HEART = (
+    "................",
+    "................",
+    "................",
+    "...####..####...",
+    "..############..",
+    "..############..",
+    ".##############.",
+    "..############..",
+    "..############..",
+    "...##########...",
+    "....########....",
+    ".....######.....",
+    "......####......",
+    ".......##.......",
+    "................",
+    "................",
+)
+SHOE = (
+    "................",
+    "................",
+    "................",
+    "................",
+    "......###.......",
+    "....######......",
+    "...#######......",
+    "...#########....",
+    "...###########..",
+    "...###########..",
+    "..############..",
+    ".##############.",
+    ".##############.",
+    "..############..",
+    "................",
+    "................",
+)
+
+
+def write_glyph(rows, ink, name):
+    size = len(rows)
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    pixels = []
+    for row in rows:
+        for ch in row:
+            pixels.append(ink + (255,) if ch == "#" else (0, 0, 0, 0))
+    image.putdata(pixels)
+    path = os.path.join(DRAW, name)
+    image.save(path, "PNG", optimize=True)
+    print("wrote {} ({}x{})".format(path, size, size))
+
+
 def main():
     write_mark((0x00, 0x00, 0x00), "solana_mark_black.png")
     write_mark((0xFF, 0xFF, 0xFF), "solana_mark_white.png")
+    write_glyph(HEART, (0x00, 0x00, 0x00), "heart_black.png")
+    write_glyph(HEART, (0xFF, 0xFF, 0xFF), "heart_white.png")
+    write_glyph(SHOE, (0x00, 0x00, 0x00), "shoe_black.png")
+    write_glyph(SHOE, (0xFF, 0xFF, 0xFF), "shoe_white.png")
 
     big = SIZE * SCALE
     image = Image.new("RGB", (big, big), BG)

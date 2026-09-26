@@ -94,13 +94,48 @@ def draw_row(draw, centre_x, y_centre, font, height, text, colour):
     draw.text((centre_x, top), text, font=font, fill=colour, anchor="ma")
 
 
-def paste_mark(image, cx, cy, day):
-    """Official logomark bitmap, black on day / white at night."""
+DRAW = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "resources", "drawables")
+
+
+def paste_mark(image, cx, top, day):
+    """Official logomark, top-aligned like SolanaEpochView.onUpdate."""
     name = "solana_mark_black.png" if day else "solana_mark_white.png"
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "resources", "drawables", name)
-    mark = Image.open(path).convert("RGBA")
-    image.paste(mark, (cx - mark.width // 2, cy - mark.height // 2), mark)
+    mark = Image.open(os.path.join(DRAW, name)).convert("RGBA")
+    image.paste(mark, (cx - mark.width // 2, top), mark)
+    return mark.height
+
+
+def text_width(font, text):
+    box = font.getbbox(text)
+    return box[2] - box[0]
+
+
+def icon_value_width(icon_name, text, font):
+    icon = Image.open(os.path.join(DRAW, icon_name))
+    return icon.width + 3 + text_width(font, text)
+
+
+def chord_dx(inner, dy, half_w, half_h):
+    reach_y = abs(dy) + half_h
+    if reach_y >= inner:
+        return 0
+    chord = int((inner * inner - reach_y * reach_y) ** 0.5)
+    dx = chord - half_w
+    return dx if dx > 0 else 0
+
+
+def draw_icon_value(image, draw, cx, y_centre, icon_name, text, font, height, colour):
+    """Mirror of SolanaEpochView.drawIconValue: icon + text, group-centred."""
+    icon = Image.open(os.path.join(DRAW, icon_name)).convert("RGBA")
+    bbox = font.getbbox(text)
+    text_w = bbox[2] - bbox[0]
+    gap = 3
+    total = icon.width + gap + text_w
+    x = cx - total // 2
+    image.paste(icon, (x, y_centre - icon.height // 2), icon)
+    draw.text((x + icon.width + gap, y_centre - height // 2), text,
+              font=font, fill=colour, anchor="la")
 
 
 def palette_for(day):
@@ -128,7 +163,6 @@ def render(device, state):
     centre_x, centre_y = width // 2, height // 2
     radius = width // 2 - 5
     pen = max(6, width // 28)
-    gap = max(3, width // 70)
 
     box = (centre_x - radius, centre_y - radius, centre_x + radius, centre_y + radius)
     draw.ellipse(box, outline=pal["track"], width=pen)
@@ -147,35 +181,44 @@ def render(device, state):
     small, small_px = fonts["small"]
     clock_font, clock_px = fonts["numberMedium"]
 
-    paste_mark(image, centre_x, centre_y - int(height * 0.36), state.get("day", True))
+    inner = radius - (pen + 1) // 2 - 8
+    gap = 3
+    day = state.get("day", True)
+    mark_bottom = centre_y - inner + 2
+    mark_bottom += paste_mark(image, centre_x, mark_bottom, day)
 
-    draw_row(draw, centre_x, centre_y - int(height * 0.28), xtiny, xtiny_px,
+    draw_row(draw, centre_x, mark_bottom + gap + xtiny_px // 2, xtiny, xtiny_px,
              state["date"], pal["secondary"])
 
-    clock_centre = centre_y - int(height * 0.12)
-    draw_row(draw, centre_x, clock_centre, clock_font, clock_px,
+    draw_row(draw, centre_x, centre_y, clock_font, clock_px,
              state["clock"], pal["primary"])
 
-    row_top = clock_centre + clock_px // 2 + gap
-    draw_row(draw, centre_x, row_top + small_px // 2, small, small_px,
-             state["epoch"], state["accent"])
-    row_top += small_px + gap
+    heart = "heart_black.png" if day else "heart_white.png"
+    shoe = "shoe_black.png" if day else "shoe_white.png"
+    side_y = centre_y - int(height * 0.16)
+    hr_dx = chord_dx(inner, side_y - centre_y,
+                     icon_value_width(heart, state["hr"], small) // 2, small_px // 2)
+    st_dx = chord_dx(inner, side_y - centre_y,
+                     icon_value_width(shoe, state["steps"], small) // 2, small_px // 2)
+    draw_icon_value(image, draw, centre_x - hr_dx, side_y, heart, state["hr"],
+                    small, small_px, pal["primary"])
+    draw_icon_value(image, draw, centre_x + st_dx, side_y, shoe, state["steps"],
+                    small, small_px, pal["primary"])
 
-    draw_row(draw, centre_x, row_top + tiny_px // 2, tiny, tiny_px,
+    lower_y = centre_y + int(height * 0.18)
+    sol = state.get("sol", "$--")
+    epoch = state["epoch"]
+    sol_dx = chord_dx(inner, lower_y - centre_y, text_width(small, sol) // 2, small_px // 2)
+    ep_dx = chord_dx(inner, lower_y - centre_y, text_width(small, epoch) // 2, small_px // 2)
+    draw_row(draw, centre_x - sol_dx, lower_y, small, small_px, sol, state["accent"])
+    draw_row(draw, centre_x + ep_dx, lower_y, small, small_px, epoch, state["accent"])
+
+    status_y = centre_y + inner - xtiny_px // 2 - 2
+    count_y = status_y - xtiny_px // 2 - gap - tiny_px // 2
+    draw_row(draw, centre_x, count_y, tiny, tiny_px,
              state["countdown"], pal["primary"])
-    row_top += tiny_px + gap
-
-    draw_row(draw, centre_x, row_top + xtiny_px // 2, xtiny, xtiny_px,
+    draw_row(draw, centre_x, status_y, xtiny, xtiny_px,
              state["status"], state["status_colour"])
-    row_top += xtiny_px + gap * 2
-
-    stats_x = int(width * 0.28)
-    label_y = row_top + xtiny_px // 2
-    value_y = row_top + xtiny_px + gap // 2 + tiny_px // 2
-    draw_row(draw, centre_x - stats_x, label_y, xtiny, xtiny_px, "HR", pal["secondary"])
-    draw_row(draw, centre_x - stats_x, value_y, tiny, tiny_px, state["hr"], pal["primary"])
-    draw_row(draw, centre_x + stats_x, label_y, xtiny, xtiny_px, "STEPS", pal["secondary"])
-    draw_row(draw, centre_x + stats_x, value_y, tiny, tiny_px, state["steps"], pal["primary"])
 
     flat = [c for colour in PALETTE for c in colour]
     reference = Image.new("P", (1, 1))

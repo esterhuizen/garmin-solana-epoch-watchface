@@ -21,6 +21,7 @@ import Toybox.ActivityMonitor;
 import Toybox.Application.Storage;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Math;
 import Toybox.SensorHistory;
 import Toybox.System;
 import Toybox.Time;
@@ -48,6 +49,10 @@ class SolanaEpochView extends WatchUi.WatchFace {
     private var _solUsd as Number = -1;
     private var _markBlack as BitmapResource?;
     private var _markWhite as BitmapResource?;
+    private var _heartBlack as BitmapResource?;
+    private var _heartWhite as BitmapResource?;
+    private var _shoeBlack as BitmapResource?;
+    private var _shoeWhite as BitmapResource?;
 
     //! Constructor
     public function initialize() {
@@ -59,6 +64,10 @@ class SolanaEpochView extends WatchUi.WatchFace {
     public function onLayout(dc as Dc) as Void {
         _markBlack = WatchUi.loadResource(Rez.Drawables.SolanaMarkBlack) as BitmapResource;
         _markWhite = WatchUi.loadResource(Rez.Drawables.SolanaMarkWhite) as BitmapResource;
+        _heartBlack = WatchUi.loadResource(Rez.Drawables.HeartBlack) as BitmapResource;
+        _heartWhite = WatchUi.loadResource(Rez.Drawables.HeartWhite) as BitmapResource;
+        _shoeBlack = WatchUi.loadResource(Rez.Drawables.ShoeBlack) as BitmapResource;
+        _shoeWhite = WatchUi.loadResource(Rez.Drawables.ShoeWhite) as BitmapResource;
     }
 
     //! Called when the face becomes visible.
@@ -196,48 +205,51 @@ class SolanaEpochView extends WatchUi.WatchFace {
         }
         dc.setPenWidth(1);
 
-        // ---- Compass layout -------------------------------------------------------
-        // Time in the middle. Complications on the sides so they are not a second
-        // vertical stack that collides on a 280 round.
-        //   12: date (+ small mark above)
-        //   10 / 2: HR and steps
-        //   8 / 4: SOL whole dollars and epoch number
-        //   6: countdown, then weather + percent
-        var leftX = centreX - (width * 0.30).toNumber();
-        var rightX = centreX + (width * 0.30).toNumber();
+        // ---- Compass layout, clipped to the inner edge of the ring --------------
+        // Time in the middle. Side complications sit on a chord so wide strings
+        // (steps, epoch) cannot enter the stroke. Top/bottom rows stack from the
+        // inner radius using measured font heights.
+        var inner = radius - (penWidth + 1) / 2 - 8;
+        var gap = 3;
+        var xtinyH = Graphics.getFontHeight(Graphics.FONT_XTINY);
+        var tinyH = Graphics.getFontHeight(Graphics.FONT_TINY);
+        var smallH = Graphics.getFontHeight(Graphics.FONT_SMALL);
 
         var mark = day ? _markBlack : _markWhite;
+        var markBottom = centreY - inner + 2;
         if (mark != null) {
             var bitmap = mark as BitmapResource;
-            dc.drawBitmap(
-                centreX - bitmap.getWidth() / 2,
-                centreY - (height * 0.42).toNumber() - bitmap.getHeight() / 2,
-                bitmap);
+            dc.drawBitmap(centreX - bitmap.getWidth() / 2, markBottom, bitmap);
+            markBottom += bitmap.getHeight();
         }
-
-        drawRow(dc, centreX, centreY - (height * 0.32).toNumber(),
+        drawRow(dc, centreX, markBottom + gap + xtinyH / 2,
             Graphics.FONT_XTINY, dateString(clockInfo), secondary);
 
         drawRow(dc, centreX, centreY, Graphics.FONT_NUMBER_MEDIUM,
             timeString(clockInfo), primary);
 
-        var sideY = centreY - (height * 0.18).toNumber();
-        drawRow(dc, leftX, sideY, Graphics.FONT_SMALL, heartRateText(), primary);
-        drawRow(dc, rightX, sideY, Graphics.FONT_SMALL, stepCountText(), primary);
+        var heart = day ? _heartBlack : _heartWhite;
+        var shoe = day ? _shoeBlack : _shoeWhite;
+        var hrText = heartRateText();
+        var stepsText = stepCountText();
+        var sideY = centreY - (height * 0.16).toNumber();
+        var hrDx = chordDx(inner, sideY - centreY, iconValueWidth(dc, heart, hrText, Graphics.FONT_SMALL) / 2, smallH / 2);
+        var stDx = chordDx(inner, sideY - centreY, iconValueWidth(dc, shoe, stepsText, Graphics.FONT_SMALL) / 2, smallH / 2);
+        drawIconValue(dc, centreX - hrDx, sideY, heart, hrText, Graphics.FONT_SMALL, primary);
+        drawIconValue(dc, centreX + stDx, sideY, shoe, stepsText, Graphics.FONT_SMALL, primary);
 
-        var lowerY = centreY + (height * 0.20).toNumber();
+        var lowerY = centreY + (height * 0.18).toNumber();
         var solText = (_solUsd >= 0) ? "$" + _solUsd.format("%d") : "$--";
-        var epochText = _haveData ? _epoch.format("%d") : "--";
-        drawRow(dc, leftX, lowerY, Graphics.FONT_SMALL, solText, _accent);
-        drawRow(dc, rightX, lowerY, Graphics.FONT_SMALL, epochText, _accent);
+        var epochText = _haveData ? "E " + _epoch.format("%d") : "E --";
+        var solDx = chordDx(inner, lowerY - centreY, dc.getTextWidthInPixels(solText, Graphics.FONT_SMALL) / 2, smallH / 2);
+        var epDx = chordDx(inner, lowerY - centreY, dc.getTextWidthInPixels(epochText, Graphics.FONT_SMALL) / 2, smallH / 2);
+        drawRow(dc, centreX - solDx, lowerY, Graphics.FONT_SMALL, solText, _accent);
+        drawRow(dc, centreX + epDx, lowerY, Graphics.FONT_SMALL, epochText, _accent);
 
         var countdown = "no data";
         if (_haveData) {
             countdown = rollover ? "rollover" : formatCountdown(secsLeft);
         }
-        drawRow(dc, centreX, centreY + (height * 0.34).toNumber(),
-            Graphics.FONT_TINY, countdown, primary);
-
         var status = "--";
         var statusColor = secondary;
         if (_haveError) {
@@ -255,8 +267,10 @@ class SolanaEpochView extends WatchUi.WatchFace {
         if (!System.getDeviceSettings().phoneConnected) {
             status += " x";
         }
-        drawRow(dc, centreX, centreY + (height * 0.44).toNumber(),
-            Graphics.FONT_XTINY, status, statusColor);
+        var statusY = centreY + inner - xtinyH / 2 - 2;
+        var countY = statusY - xtinyH / 2 - gap - tinyH / 2;
+        drawRow(dc, centreX, countY, Graphics.FONT_TINY, countdown, primary);
+        drawRow(dc, centreX, statusY, Graphics.FONT_XTINY, status, statusColor);
     }
 
     //! Daytime is 07:00-18:59 local. MIP does not emit light, so the white field is for
@@ -303,7 +317,7 @@ class SolanaEpochView extends WatchUi.WatchFace {
     }
 
     //! Current temperature from Garmin Connect weather, in the watch's C/F setting.
-    //! @return e.g. "18C" / "64F", or "--" when the phone has not delivered weather
+    //! @return e.g. "18°" / "64°", or "--" when the phone has not delivered weather
     private function weatherText() as String {
         if (!((Toybox has :Weather) && (Weather has :getCurrentConditions))) {
             return "--";
@@ -313,10 +327,58 @@ class SolanaEpochView extends WatchUi.WatchFace {
             return "--";
         }
         var celsius = (cond.temperature as Number);
+        var value = celsius;
         if (System.getDeviceSettings().temperatureUnits == System.UNIT_STATUTE) {
-            return ((celsius * 9) / 5 + 32).format("%d") + "F";
+            value = (celsius * 9) / 5 + 32;
         }
-        return celsius.format("%d") + "C";
+        return value.format("%d") + "°";
+    }
+
+    //! Horizontal offset from centre that keeps a W x H box inside the inner radius.
+    //! @param inner Usable radius inside the ring stroke
+    //! @param dy Vertical offset of the box centre from the screen centre
+    //! @param halfW Half the box width
+    //! @param halfH Half the box height
+    //! @return dx to the box centre, 0 if it cannot fit on a chord
+    private function chordDx(inner as Number, dy as Number, halfW as Number, halfH as Number) as Number {
+        var ay = dy < 0 ? -dy : dy;
+        var reachY = ay + halfH;
+        if (reachY >= inner) {
+            return 0;
+        }
+        var chord = Math.sqrt((inner * inner - reachY * reachY).toFloat()).toNumber();
+        var dx = chord - halfW;
+        return dx < 0 ? 0 : dx;
+    }
+
+    //! Pixel width of an icon-plus-value group.
+    private function iconValueWidth(dc as Dc, icon as BitmapResource?, text as String,
+            font as FontDefinition) as Number {
+        var w = dc.getTextWidthInPixels(text, font);
+        if (icon != null) {
+            w += (icon as BitmapResource).getWidth() + 3;
+        }
+        return w;
+    }
+
+    //! Icon plus value, grouped and centred on (centreX, yCentre).
+    //! Falls back to text-only if the bitmap failed to load.
+    private function drawIconValue(dc as Dc, centreX as Number, yCentre as Number,
+            icon as BitmapResource?, text as String, font as FontDefinition,
+            color as ColorType) as Void {
+        if (icon == null) {
+            drawRow(dc, centreX, yCentre, font, text, color);
+            return;
+        }
+        var bitmap = icon as BitmapResource;
+        var gap = 3;
+        var total = bitmap.getWidth() + gap + dc.getTextWidthInPixels(text, font);
+        var x = centreX - total / 2;
+        dc.drawBitmap(x, yCentre - bitmap.getHeight() / 2, bitmap);
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x + bitmap.getWidth() + gap,
+            yCentre - Graphics.getFontHeight(font) / 2, font, text,
+            Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     //! Draw one centre-justified row of text.
