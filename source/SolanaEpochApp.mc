@@ -39,6 +39,7 @@ module Se {
     const F_SLOTS_IN_EPOCH = "slotsInEpoch";
     const F_FETCH_TS = "fetchTs";
     const F_SLOT_SECS = "slotSecs";
+    const F_SOL_USD = "solUsd";
 
     // ---- Application.Properties keys ---------------------------------------------
     const PROP_RPC_URL = "RpcUrl";
@@ -46,6 +47,9 @@ module Se {
     const PROP_ACCENT_COLOR = "AccentColor";
 
     const DEFAULT_RPC_URL = "https://api.mainnet-beta.solana.com";
+    // Jupiter price v3, lite host (no key). Whole-dollar SOL for the face.
+    const PRICE_URL = "https://lite-api.jup.ag/price/v3?ids=So11111111111111111111111111111111111111112";
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
 
     // Anything below 5 minutes throws Background.InvalidBackgroundTimeException. The
     // upper clamp matters too: RefreshMinutes is untrusted input from the same source as
@@ -405,6 +409,19 @@ class SolanaEpochApp extends Application.AppBase {
         state.put($.Se.F_SLOTS_IN_EPOCH, slotsInEpoch);
         state.put($.Se.F_FETCH_TS, nowTs);
         state.put($.Se.F_SLOT_SECS, slotSecs);
+        var solUsd = -1;
+        var solValue = payload.get($.Se.F_SOL_USD);
+        if (solValue instanceof Number) {
+            solUsd = solValue as Number;
+        } else {
+            var prev = $.Se.readState();
+            if (prev != null) {
+                solUsd = $.Se.numberOr((prev as Dictionary).get($.Se.F_SOL_USD), -1);
+            }
+        }
+        if (solUsd >= 0) {
+            state.put($.Se.F_SOL_USD, solUsd);
+        }
         Storage.setValue($.Se.KEY_STATE, state);
         Storage.deleteValue($.Se.KEY_ERR);
 

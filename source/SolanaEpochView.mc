@@ -45,6 +45,7 @@ class SolanaEpochView extends WatchUi.WatchFace {
     private var _slotSecs as Float = $.Se.DEFAULT_SLOT_SECS;
     private var _haveError as Boolean = false;
     private var _errCode as Number = 0;
+    private var _solUsd as Number = -1;
     private var _markBlack as BitmapResource?;
     private var _markWhite as BitmapResource?;
 
@@ -99,6 +100,9 @@ class SolanaEpochView extends WatchUi.WatchFace {
             _slotsInEpoch = $.Se.numberOr(s.get($.Se.F_SLOTS_IN_EPOCH), 0);
             _fetchTs = $.Se.numberOr(s.get($.Se.F_FETCH_TS), 0);
             _slotSecs = $.Se.slotSecsOr(s.get($.Se.F_SLOT_SECS), $.Se.DEFAULT_SLOT_SECS);
+            _solUsd = $.Se.numberOr(s.get($.Se.F_SOL_USD), -1);
+        } else {
+            _solUsd = -1;
         }
 
         var errValue = Storage.getValue($.Se.KEY_ERR);
@@ -123,11 +127,6 @@ class SolanaEpochView extends WatchUi.WatchFace {
         var penWidth = width / 28;
         if (penWidth < 6) {
             penWidth = 6;
-        }
-        // Gap between the stacked lower rows: 3 px at 240 and 260, 4 px at 280.
-        var gap = width / 70;
-        if (gap < 3) {
-            gap = 3;
         }
 
         var nowTs = Time.now().value();
@@ -197,58 +196,57 @@ class SolanaEpochView extends WatchUi.WatchFace {
         }
         dc.setPenWidth(1);
 
-        // ---- Text stack -----------------------------------------------------------
-        // Logo sits above the date. Date and clock stay anchored to screen fractions.
-        // Everything below the clock is stacked downward from the measured bottom of
-        // the clock row, so no assumed font metric can overlap two rows. HR and steps
-        // occupy the spare lower third as a two-column row.
+        // ---- Compass layout -------------------------------------------------------
+        // Time in the middle. Complications on the sides so they are not a second
+        // vertical stack that collides on a 280 round.
+        //   12: date (+ small mark above)
+        //   10 / 2: HR and steps
+        //   8 / 4: SOL whole dollars and epoch number
+        //   6: countdown, then weather + percent
+        var leftX = centreX - (width * 0.30).toNumber();
+        var rightX = centreX + (width * 0.30).toNumber();
+
         var mark = day ? _markBlack : _markWhite;
         if (mark != null) {
             var bitmap = mark as BitmapResource;
             dc.drawBitmap(
                 centreX - bitmap.getWidth() / 2,
-                centreY - (height * 0.40).toNumber() - bitmap.getHeight() / 2,
+                centreY - (height * 0.42).toNumber() - bitmap.getHeight() / 2,
                 bitmap);
         }
 
-        drawRow(dc, centreX, centreY - (height * 0.30).toNumber(),
+        drawRow(dc, centreX, centreY - (height * 0.32).toNumber(),
             Graphics.FONT_XTINY, dateString(clockInfo), secondary);
 
-        // FIRST THING TO CHECK ON REAL HARDWARE: the clock's vertical placement.
-        // FONT_NUMBER_* glyph boxes are reported to carry more padding above the ascent
-        // than getFontHeight() implies, so the digits may sit visibly low inside the row.
-        // If they do, nudge this fraction up; the stack below follows automatically.
-        var clockCentre = centreY - (height * 0.16).toNumber();
-        var clockHeight = Graphics.getFontHeight(Graphics.FONT_NUMBER_MEDIUM);
-        drawRow(dc, centreX, clockCentre, Graphics.FONT_NUMBER_MEDIUM,
+        drawRow(dc, centreX, centreY, Graphics.FONT_NUMBER_MEDIUM,
             timeString(clockInfo), primary);
 
-        var rowTop = clockCentre + clockHeight / 2 + gap;
+        var sideY = centreY - (height * 0.18).toNumber();
+        drawRow(dc, leftX, sideY, Graphics.FONT_SMALL, heartRateText(), primary);
+        drawRow(dc, rightX, sideY, Graphics.FONT_SMALL, stepCountText(), primary);
 
-        var epochHeight = Graphics.getFontHeight(Graphics.FONT_SMALL);
-        drawRow(dc, centreX, rowTop + epochHeight / 2, Graphics.FONT_SMALL,
-            _haveData ? "EPOCH " + _epoch.format("%d") : "EPOCH --", _accent);
-        rowTop += epochHeight + gap;
+        var lowerY = centreY + (height * 0.20).toNumber();
+        var solText = (_solUsd >= 0) ? "$" + _solUsd.format("%d") : "$--";
+        var epochText = _haveData ? _epoch.format("%d") : "--";
+        drawRow(dc, leftX, lowerY, Graphics.FONT_SMALL, solText, _accent);
+        drawRow(dc, rightX, lowerY, Graphics.FONT_SMALL, epochText, _accent);
 
         var countdown = "no data";
         if (_haveData) {
             countdown = rollover ? "rollover" : formatCountdown(secsLeft);
         }
-        var countdownHeight = Graphics.getFontHeight(Graphics.FONT_TINY);
-        drawRow(dc, centreX, rowTop + countdownHeight / 2, Graphics.FONT_TINY,
-            countdown, primary);
-        rowTop += countdownHeight + gap;
+        drawRow(dc, centreX, centreY + (height * 0.34).toNumber(),
+            Graphics.FONT_TINY, countdown, primary);
 
-        // ---- Status line ----------------------------------------------------------
         var status = "--";
         var statusColor = secondary;
         if (_haveError) {
-            // Shown verbatim: a JSON-RPC error.code (-32768..-32000), a Connect IQ
-            // transport code, an HTTP status, or 1 for an unusable body.
             status = "RPC " + _errCode.format("%d");
             statusColor = warning;
         } else if (_haveData) {
-            status = (progress * 100.0).format("%.1f") + "%";
+            status = (progress * 100.0).format("%.0f") + "%  " + weatherText();
+        } else {
+            status = weatherText();
         }
         if (_haveData && elapsed > 3 * _refreshSecs) {
             status += " !";
@@ -257,21 +255,8 @@ class SolanaEpochView extends WatchUi.WatchFace {
         if (!System.getDeviceSettings().phoneConnected) {
             status += " x";
         }
-        var statusHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
-        drawRow(dc, centreX, rowTop + statusHeight / 2, Graphics.FONT_XTINY,
-            status, statusColor);
-        rowTop += statusHeight + gap * 2;
-
-        // ---- HR / weather / steps -------------------------------------------------
-        // One row, stacked under status (not a second independent Y). Values only:
-        // labels on a 280 round collided with the % line. x-offset 0.20 stays inside
-        // the inner ring (the old 0.28 columns clipped on the Enduro bezel).
-        var valueHeight = Graphics.getFontHeight(Graphics.FONT_SMALL);
-        var statsY = rowTop + valueHeight / 2;
-        var statsXOff = (width * 0.20).toNumber();
-        drawRow(dc, centreX - statsXOff, statsY, Graphics.FONT_SMALL, heartRateText(), primary);
-        drawRow(dc, centreX, statsY, Graphics.FONT_SMALL, weatherText(), primary);
-        drawRow(dc, centreX + statsXOff, statsY, Graphics.FONT_SMALL, stepCountText(), primary);
+        drawRow(dc, centreX, centreY + (height * 0.44).toNumber(),
+            Graphics.FONT_XTINY, status, statusColor);
     }
 
     //! Daytime is 07:00-18:59 local. MIP does not emit light, so the white field is for

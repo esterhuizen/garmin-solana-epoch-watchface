@@ -1,17 +1,14 @@
 //! Solana epoch watch face - background service.
 //!
 //! A watch face cannot do foreground HTTP, so all network access happens here. The
-//! process is started by the temporal event, makes ONE JSON-RPC POST, and must reach
-//! Background.exit() before the OS force-kills it at 30 s.
+//! process is started by the temporal event and must reach Background.exit() before
+//! the OS force-kills it at 30 s.
 //!
-//! Invariant: **one HTTP request per background process, ever.** There used to be a
-//! chained getRecentPerformanceSamples request behind getEpochInfo to seed the slot-time
-//! calibration. It bought about 0.16% accuracy for the first 30 minutes - roughly 12
-//! seconds on a two-day epoch - in exchange for a permanent-failure mode: the flag that
-//! decided whether to chain was derived from Storage, which only the FOREGROUND writes,
-//! so if the two-request cycle never reached Background.exit() nothing was stored and
-//! every later cycle chained and failed identically, forever. Se.DEFAULT_SLOT_SECS is now
-//! the only seed and the epoch-delta calibration takes over on the second cycle.
+//! Epoch fetch is always first. SOL/USD (Jupiter price v3) is an optional second GET
+//! that runs only after a good getEpochInfo. There is no Storage flag: if the price
+//! call hangs, the OS kill is the only failure, and the next cycle still starts with
+//! getEpochInfo. Price failure still exits with the epoch payload so the face never
+//! wedges on a missing dollar amount.
 //!
 //! Only epoch, slotIndex and slotsInEpoch are parsed out of getEpochInfo. absoluteSlot
 //! is derivable as epoch * slotsInEpoch + slotIndex and is not needed; transactionCount
@@ -38,6 +35,7 @@ class BackgroundService extends System.ServiceDelegate {
     private var _epoch as Number = 0;
     private var _slotIndex as Number = 0;
     private var _slotsInEpoch as Number = 0;
+    private var _solUsd as Number = -1;
 
     //! Constructor
     public function initialize() {
@@ -112,6 +110,30 @@ class BackgroundService extends System.ServiceDelegate {
             return;
         }
 
+        Communications.makeWebRequest(
+            $.Se.PRICE_URL,
+            {},
+            {
+                :method => Communications.HTTP_REQUEST_METHOD_GET,
+                :headers => { "User-Agent" => "SolanaEpoch" },
+                :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
+            },
+            method(:onPrice));
+    }
+
+    //! Jupiter price v3. Always exits with the epoch payload, price or not.
+    //! @param responseCode HTTP status, or a negative Connect IQ transport error
+    //! @param data Parsed JSON body
+    public function onPrice(responseCode as Number, data as Dictionary or String or Null) as Void {
+        if (responseCode == 200 && data instanceof Dictionary) {
+            var row = (data as Dictionary).get($.Se.SOL_MINT);
+            if (row instanceof Dictionary) {
+                var dollars = dollarsFrom((row as Dictionary).get("usdPrice"));
+                if (dollars != null) {
+                    _solUsd = dollars as Number;
+                }
+            }
+        }
         exitWithEpoch();
     }
 
@@ -132,6 +154,9 @@ class BackgroundService extends System.ServiceDelegate {
         // both lags the arc and - worse - poisons the calibration, because the accepted
         // measurement becomes slotSecs * (deliveryDelta / fetchDelta).
         payload.put($.Se.F_FETCH_TS, Time.now().value());
+        if (_solUsd >= 0) {
+            payload.put($.Se.F_SOL_USD, _solUsd);
+        }
         Background.exit(payload);
     }
 
@@ -178,5 +203,23 @@ class BackgroundService extends System.ServiceDelegate {
             return (value as Float).toNumber();
         }
         return null;
+    }
+
+    //! Round a JSON price to whole dollars. Accepts Number/Float/Double.
+    //! @param value usdPrice from Jupiter
+    //! @return Whole dollars, or null if unusable
+    private function dollarsFrom(value as Object?) as Number? {
+        var n = -1.0;
+        if (value instanceof Float) {
+            n = value as Float;
+        } else if (value instanceof Number) {
+            n = (value as Number).toFloat();
+        } else if (value instanceof Double) {
+            n = (value as Double).toFloat();
+        }
+        if (n < 0.0 || n > 100000.0) {
+            return null;
+        }
+        return (n + 0.5).toNumber();
     }
 }
