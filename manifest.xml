@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <!--
-        fenix 6 family only. All five products report deviceGroup "API level 3.4",
+        fenix 6 family + original Enduro. These products report deviceGroup "API level 3.4",
         so 3.4 is the hard API ceiling for this face. minApiLevel stays at 3.0.0
         because nothing here needs more than that.
 
         There is no separate quatix 6 or tactix Delta product id: quatix 6 / 6S ship
         under fenix6pro, and quatix 6X / tactix Delta ship under fenix6xpro, so these
-        five ids already cover the whole family.
+        five ids already cover the whole family. Enduro is listed separately because
+        it has its own Connect IQ product id.
     -->
     <iq:application
         entry="SolanaEpochApp"
@@ -16,17 +17,19 @@
         minApiLevel="3.0.0"
         name="@Strings.AppName"
         type="watchface"
-        version="1.0.0">
+        version="1.3.2">
         <iq:products>
             <iq:product id="fenix6"/>
             <iq:product id="fenix6pro"/>
             <iq:product id="fenix6s"/>
             <iq:product id="fenix6spro"/>
             <iq:product id="fenix6xpro"/>
+            <iq:product id="enduro"/>
         </iq:products>
         <iq:permissions>
             <iq:uses-permission id="Background"/>
             <iq:uses-permission id="Communications"/>
+            <iq:uses-permission id="SensorHistory"/>
         </iq:permissions>
         <iq:languages>
             <iq:language>eng</iq:language>

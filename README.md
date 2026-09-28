@@ -1,45 +1,56 @@
-# Solana Epoch — Garmin fenix 6 watch face
+# Solana Epoch - Garmin fenix 6 / Enduro watch face
 
-A Connect IQ watch face for the fenix 6 family that shows how far through the current
-Solana mainnet-beta epoch the network is, and how long is left.
+A Connect IQ watch face for the fenix 6 family and original Enduro that shows how far
+through the current Solana mainnet-beta epoch the network is, and how long is left.
 
 ## What it shows
 
 ```
-              ╭──────────────╮
-             ╱   THU 18 SEP   ╲        date, FONT_XTINY, grey
-            │      14:32       │       time, FONT_NUMBER_MEDIUM, white
-            │   EPOCH 1036     │       epoch number, FONT_SMALL, accent
-            │   2h 14m left    │       countdown, FONT_TINY, white
-             ╲    94.1%       ╱        progress + status, FONT_XTINY, grey
-              ╰──────────────╯
-        outer ring: dark-grey track with an accent
-        arc sweeping clockwise from 12 o'clock
+              ╭──────────────────╮
+             ╱    [solana mark]    ╲     official logomark, black day / white night
+            │     THU 25 SEP       │     date, FONT_XTINY
+            │  heart 72   shoe 8432│     HR + steps, FONT_SMALL, inside the ring
+            │        14:32         │     time, FONT_NUMBER_MEDIUM
+            │   $214        E 1041 │     SOL whole dollars + epoch, accent
+            │     1d 2h left       │     countdown, FONT_TINY
+            │      17%  18°        │     progress + weather, FONT_XTINY
+             ╲                    ╱
+              ╰──────────────────╯
+        outer ring: track with an accent arc from 12 o'clock
+        day (07:00-19:00): white field, black type, black logo
+        night: black field, white type, white logo
+        every row is clipped to the inner edge of the ring
 ```
 
-- **Ring** — epoch progress. Full circle = epoch complete. Pen width is `max(6, w/28)`.
-- **Countdown** — adaptive: `Xd Yh left` above a day, `Xh Ym left` above an hour, `Ym left`
+- **Ring** - epoch progress. Full circle = epoch complete. Pen width is `max(6, w/28)`.
+- **Day / night** - local hour 07:00-18:59 is a white MIP field (readable outdoors). After 19:00 the original black field returns. The Solana logomark is the official asset from [solana.com/branding](https://solana.com/branding): black on white, white on black.
+- **HR** - heart icon plus `Activity.getActivityInfo().currentHeartRate`, falling back to the newest `SensorHistory` sample. `--` until a sample exists.
+- **Steps** - shoe icon plus `ActivityMonitor.getInfo().steps` for today. `Nk` above 100000.
+- **Epoch** - `E` plus the epoch number.
+- **SOL** - whole-dollar price from Jupiter, `$--` until the first fetch.
+- **Weather** - Garmin Connect temperature with a degree symbol (`18°`), `--` until the phone has delivered conditions.
+- **Countdown** - adaptive: `Xd Yh left` above a day, `Xh Ym left` above an hour, `Ym left`
   above a minute, and `<1m left` below that (never `0m left`). Shows `rollover` once the
   estimate runs past the end of the epoch, because at that point the real epoch has almost
   certainly advanced and we have not refetched yet.
-- **Status line** — percent through the epoch, plus glyphs:
-  - ` !` in orange — stored data is older than 3× the refresh interval.
-  - ` x` — the phone is not connected, so the next fetch will fail.
+- **Status line** - percent through the epoch, plus glyphs:
+  - ` !` in orange - stored data is older than 3x the refresh interval.
+  - ` x` - the phone is not connected, so the next fetch will fail.
   - `RPC <code>` in orange replaces the percent when the last fetch returned an error.
     The code is printed verbatim and the number spaces do not collide:
     `-32768`..`-32000` is the server's own JSON-RPC `error.code`, passed straight through;
     `-101` BLE host timeout, `-300` request timed out, `-400` invalid HTTP body, `-402`
     response too large and `-403` response out of memory are Connect IQ transport errors;
     `1xx`..`5xx` are HTTP statuses. `RPC 1` is our own fallback for an HTTP 200 whose body
-    carries neither a usable `result` nor a numeric error code — the captive-portal case.
+    carries neither a usable `result` nor a numeric error code - the captive-portal case.
   - `no data` on the countdown line until the first successful fetch lands.
 
-One layout serves all three screen sizes (240 / 260 / 280 px round). Every coordinate is
-derived from `dc.getWidth()`/`getHeight()`, so there are no per-device resource overrides.
-The date and clock rows are anchored to screen fractions; the epoch, countdown and status
-rows below them are **stacked from measured `Graphics.getFontHeight()` values** plus a small
-scaled gap, so no assumed font metric can make two rows collide. (`getFontHeight()` is
-exactly ascent plus descent, per `api.mir`.)
+One layout serves 240 / 260 / 280 px round (fenix 6 family + original Enduro). Every
+coordinate is derived from `dc.getWidth()`/`getHeight()`. Side complications sit on a
+chord of the inner radius so wide strings (steps, `E 1041`) cannot enter the ring stroke.
+The mark and status line stack from that same inner radius using measured
+`Graphics.getFontHeight()` values. (`getFontHeight()` is exactly ascent plus descent, per
+`api.mir`.)
 
 `FONT_NUMBER_*` is reported to carry more padding above the ascent than its height implies,
 so the clock digits may sit visibly low inside their row. That is the first thing to check on
@@ -58,7 +69,7 @@ A watch face cannot make HTTP requests from the foreground, so:
    a clock jump cannot defer it and it can never decay into a stale past Moment. Default
    interval 15 minutes, clamped to 5..240.
 
-   `onStart()` arms the schedule **only if nothing is registered yet** — re-arming a repeating
+   `onStart()` arms the schedule **only if nothing is registered yet** - re-arming a repeating
    Duration restarts its interval countdown, and `onStart()` runs on every foreground start as
    well as at the head of every background process, so an unconditional re-arm there would
    starve the event. On a fresh install with nothing stored it arms `Moment(Time.now())`
@@ -72,7 +83,7 @@ A watch face cannot make HTTP requests from the foreground, so:
 
    **One HTTP request per background process, ever.** There used to be a chained
    `getRecentPerformanceSamples` call to seed the slot-time calibration. It bought about 0.16%
-   accuracy for the first 30 minutes — roughly 12 seconds on a two-day epoch — in exchange for
+   accuracy for the first 30 minutes - roughly 12 seconds on a two-day epoch - in exchange for
    a permanent-failure mode: the flag that decided whether to chain was derived from a Storage
    key only the *foreground* writes, so if the two-request cycle never reached
    `Background.exit()` nothing was stored and every later cycle chained and failed
@@ -81,7 +92,7 @@ A watch face cannot make HTTP requests from the foreground, so:
 3. `AppBase.onBackgroundData()` runs immediately if the face is active, otherwise the
    payload is cached and delivered right after the next `onStart()`. It performs the
    slot-time calibration, writes `Application.Storage` and calls `WatchUi.requestUpdate()`.
-   This is the only writer of Storage. It does **not** reschedule anything — the repeating
+   This is the only writer of Storage. It does **not** reschedule anything - the repeating
    Duration keeps itself alive.
 4. `SolanaEpochView.onUpdate()` extrapolates the current slot from the stored snapshot plus
    the calibrated slot time. No network, no `onPartialUpdate()`. Storage and Properties are
@@ -100,17 +111,17 @@ Mainnet's slot target moved to 350 ms (SIMD-0525) and the measured rate on 2026-
 
 | key | meaning |
 |---|---|
-| `state` | one Dictionary: `{epoch, slotIndex, slotsInEpoch, fetchTs, slotSecs}` |
+| `state` | one Dictionary: `{epoch, slotIndex, slotsInEpoch, fetchTs, slotSecs, solUsd}` |
 | `err` | last error code, absent when the last fetch succeeded |
 
-The five fields share one key on purpose. Five sequential `setValue` calls can half-succeed and
+The six fields share one key on purpose. Five sequential `setValue` calls can half-succeed and
 pair a new `epoch` with an old `fetchTs`, which the view reads as a huge `elapsed` and the
 calibrator reads as an inflated `timeDelta`. One Dictionary, one `setValue`, so the update is
-atomic — and the Dictionary is validated as a whole on read (`Se.readState()`): every field
+atomic - and the Dictionary is validated as a whole on read (`Se.readState()`): every field
 present, correctly typed and in range, or it counts as no data at all. `err` keeps its own key
 because it is written on a different path; a failed fetch leaves the last good state alone.
 
-`fetchTs` is `Time.now().value()` taken **in the background process at fetch time** — see the
+`fetchTs` is `Time.now().value()` taken **in the background process at fetch time** - see the
 note below.
 
 On each successful fetch, before the old state is overwritten:
@@ -125,7 +136,7 @@ timeDelta = nowTs - oldFetchTs
 active; otherwise the system caches it until after the next `onStart()`, which on a
 fenix 6 can be minutes later because the face is stopped during activities and other
 apps. Timestamping at delivery would pair a `slotIndex` from time T with a clock reading
-from T+delay, which lags the arc and — worse — poisons the calibration, since the accepted
+from T+delay, which lags the arc and - worse - poisons the calibration, since the accepted
 measurement becomes `slotSecs * (deliveryDelta / fetchDelta)`. A 10-minute delivery lag on
 one cycle of a 15-minute interval is enough to push a 0.315 estimate to 0.42 and make the
 countdown hours wrong. This is a deliberate correction to spec §4.
@@ -133,14 +144,14 @@ countdown hours wrong. This is a deliberate correction to spec §4.
 A measurement is accepted only when `slotDelta > 300`, `timeDelta > 240` and
 `timeDelta / slotDelta` lands in `[0.08, 1.5]`, then smoothed `0.5 * old + 0.5 * measured`.
 Everything outside those guards (clock changes, epoch rollover glitches, a corrupt stored
-epoch) is rejected. Long offline gaps are fine — the average over a long window is still an
+epoch) is rejected. Long offline gaps are fine - the average over a long window is still an
 average.
 
 Those three numbers are chosen, not tuned:
 
 - `[0.08, 1.5]` is deliberately wide around today's 0.315. With the chained seeding request gone
   there is no longer any path by which a bad slot time can enter storage, so the band only has
-  to catch absurd values — and Solana has already gone 400 → 350 ms and publicly targets 200 ms,
+  to catch absurd values - and Solana has already gone 400 → 350 ms and publicly targets 200 ms,
   so a tight band would reject a real future slot-time cut.
 - `timeDelta > 240` rather than 60, because over a minute-long window the one-second
   quantisation of the two timestamps dominates the quotient. It cannot be 600 either: the
@@ -149,7 +160,7 @@ Those three numbers are chosen, not tuned:
 - Any in-band measurement is accepted and smoothed 0.5/0.5, which is what makes convergence from
   any starting state guaranteed.
 
-The seed is the constant 0.315, and nothing else — the calibration takes over on the second
+The seed is the constant 0.315, and nothing else - the calibration takes over on the second
 cycle.
 
 ## Settings
@@ -181,7 +192,7 @@ KEY=~/.Garmin/ConnectIQ/developer_key.der
 rm -rf build && mkdir -p build
 
 # per-device .prg, release (-r), strict type check (-l 3) with warnings shown (-w)
-for d in fenix6 fenix6pro fenix6s fenix6spro fenix6xpro; do
+for d in fenix6 fenix6pro fenix6s fenix6spro fenix6xpro enduro; do
   $SDK/bin/monkeyc -d $d -f monkey.jungle -o build/$d.prg -y $KEY -r -w -l 3 || echo "FAILED $d"
 done
 
@@ -189,9 +200,9 @@ done
 $SDK/bin/monkeyc -f monkey.jungle -o build/solana-epoch.iq -y $KEY -e -r -w -l 3
 ```
 
-All six invocations must print `BUILD SUCCESSFUL` with no warnings.
+All seven invocations must print `BUILD SUCCESSFUL` with no warnings.
 
-Note `-e` on `monkeyc` means `--package-app`, not "exclude annotations" — `excludeAnnotations`
+Note `-e` on `monkeyc` means `--package-app`, not "exclude annotations" - `excludeAnnotations`
 is a jungle property, not a CLI flag.
 
 `-r` is not optional, which is the whole reason `tools/build.sh` exists. The default (debug)
@@ -223,9 +234,10 @@ script; regenerate only if you change the artwork.
 
 ## Sideloading to a real watch
 
-1. Build a `.prg` for your exact product (`fenix6`, `fenix6pro`, `fenix6s`, `fenix6spro`
-   or `fenix6xpro`). quatix 6 / 6S ship under `fenix6pro`; quatix 6X and tactix Delta
-   ship under `fenix6xpro`.
+1. Build a `.prg` for your exact product (`fenix6`, `fenix6pro`, `fenix6s`, `fenix6spro`,
+   `fenix6xpro` or original `enduro`). quatix 6 / 6S ship under `fenix6pro`; quatix 6X and
+   tactix Delta ship under `fenix6xpro`. Original Enduro is `enduro` (part `006-B3638-00`),
+   not `fenix6xpro`.
 2. Connect the watch over USB. It mounts as a mass-storage volume named `GARMIN`.
 3. Copy the `.prg` into `GARMIN/APPS/` on the watch.
 4. Eject the volume and unplug. A self-signed developer key is fine for sideloading.
@@ -238,8 +250,9 @@ reads `no data`.
 ## Layout
 
 ```
-manifest.xml                              watchface, minApiLevel 3.0.0, 5 fenix 6 products,
-                                          Background + Communications permissions
+manifest.xml                              watchface, minApiLevel 3.0.0, fenix 6 family +
+                                          original Enduro, Background + Communications +
+                                          SensorHistory permissions
 monkey.jungle                             single build config, no per-device overrides
 source/SolanaEpochApp.mc                  AppBase (:background), temporal event registration,
                                           the single atomic Storage write, slot-time
@@ -254,12 +267,16 @@ resources/settings/settings.xml           settings UI
 resources/properties/properties.xml       setting defaults
 resources/drawables/drawables.xml
 resources/drawables/launcher_icon.png     40x40, generated
-tools/make_icon.py                        launcher icon generator
+resources/drawables/solana_mark_*.png     official logomark, 32x28, 1-bit
+resources/drawables/heart_*.png            HR icon, 16x16, 1-bit
+resources/drawables/shoe_*.png             steps icon, 16x16, 1-bit
+tools/make_icon.py                        launcher, logomark, heart, shoe
+tools/make_mockup.py                      layout drawings for 240/260/280
 ```
 
 ## API-level notes
 
-The fenix 6 family reports `deviceGroup = "API level 3.4"`, so 3.4 is a hard ceiling —
+The fenix 6 family reports `deviceGroup = "API level 3.4"`, so 3.4 is a hard ceiling -
 nothing newer may be called. A few consequences worth remembering when editing:
 
 - `WatchUi.requestUpdate()` carries `disableBackgroundBeforeVersion = "5.1.0"` in the SDK
