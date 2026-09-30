@@ -11,7 +11,7 @@ set -euo pipefail
 SDK="${SDK:-$HOME/.Garmin/ConnectIQ/Sdks/connectiq-sdk-lin-9.2.0}"
 KEY="${KEY:-$HOME/.Garmin/ConnectIQ/developer_key.der}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEVICES=(fenix6 fenix6pro fenix6s fenix6spro fenix6xpro)
+DEVICES=(fenix6 fenix6pro fenix6s fenix6spro fenix6xpro enduro)
 
 [ -x "$SDK/bin/monkeyc" ] || { echo "no monkeyc at $SDK/bin/monkeyc" >&2; exit 1; }
 [ -f "$KEY" ] || { echo "no developer key at $KEY" >&2; exit 1; }
