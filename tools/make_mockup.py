@@ -202,6 +202,8 @@ def render(device, state):
                      icon_value_width(shoe, state["steps"], small) // 2, small_px // 2)
     draw_icon_value(image, draw, centre_x - hr_dx, side_y, heart, state["hr"],
                     small, small_px, pal["primary"])
+    draw_row(draw, centre_x, side_y, small, small_px,
+             state.get("temp", "--"), pal["primary"])
     draw_icon_value(image, draw, centre_x + st_dx, side_y, shoe, state["steps"],
                     small, small_px, pal["primary"])
 

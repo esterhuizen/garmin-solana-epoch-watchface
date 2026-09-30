@@ -9,11 +9,11 @@ through the current Solana mainnet-beta epoch the network is, and how long is le
               ╭──────────────────╮
              ╱    [solana mark]    ╲     official logomark, black day / white night
             │     THU 25 SEP       │     date, FONT_XTINY
-            │  heart 72   shoe 8432│     HR + steps, FONT_SMALL, inside the ring
+            │  heart 72  18°  shoe 8432│  HR, current temp, steps
             │        14:32         │     time, FONT_NUMBER_MEDIUM
             │   $214        E 1041 │     SOL whole dollars + epoch, accent
             │     1d 2h left       │     countdown, FONT_TINY
-            │      17%  18°        │     progress + weather, FONT_XTINY
+            │         17%          │     epoch progress, FONT_XTINY
              ╲                    ╱
               ╰──────────────────╯
         outer ring: track with an accent arc from 12 o'clock
@@ -28,7 +28,7 @@ through the current Solana mainnet-beta epoch the network is, and how long is le
 - **Steps** - shoe icon plus `ActivityMonitor.getInfo().steps` for today. `Nk` above 100000.
 - **Epoch** - `E` plus the epoch number.
 - **SOL** - whole-dollar price from Jupiter, `$--` until the first fetch.
-- **Weather** - Garmin Connect temperature with a degree symbol (`18°`), `--` until the phone has delivered conditions.
+- **Temp** - current Garmin Connect temperature, centred between HR and steps, with a degree symbol (`18°`). `--` until the phone has delivered conditions.
 - **Countdown** - adaptive: `Xd Yh left` above a day, `Xh Ym left` above an hour, `Ym left`
   above a minute, and `<1m left` below that (never `0m left`). Shows `rollover` once the
   estimate runs past the end of the epoch, because at that point the real epoch has almost

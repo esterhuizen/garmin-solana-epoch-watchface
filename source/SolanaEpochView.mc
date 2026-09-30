@@ -236,6 +236,7 @@ class SolanaEpochView extends WatchUi.WatchFace {
         var hrDx = chordDx(inner, sideY - centreY, iconValueWidth(dc, heart, hrText, Graphics.FONT_SMALL) / 2, smallH / 2);
         var stDx = chordDx(inner, sideY - centreY, iconValueWidth(dc, shoe, stepsText, Graphics.FONT_SMALL) / 2, smallH / 2);
         drawIconValue(dc, centreX - hrDx, sideY, heart, hrText, Graphics.FONT_SMALL, primary);
+        drawRow(dc, centreX, sideY, Graphics.FONT_SMALL, weatherText(), primary);
         drawIconValue(dc, centreX + stDx, sideY, shoe, stepsText, Graphics.FONT_SMALL, primary);
 
         var lowerY = centreY + (height * 0.18).toNumber();
@@ -256,9 +257,7 @@ class SolanaEpochView extends WatchUi.WatchFace {
             status = "RPC " + _errCode.format("%d");
             statusColor = warning;
         } else if (_haveData) {
-            status = (progress * 100.0).format("%.0f") + "%  " + weatherText();
-        } else {
-            status = weatherText();
+            status = (progress * 100.0).format("%.0f") + "%";
         }
         if (_haveData && elapsed > 3 * _refreshSecs) {
             status += " !";
