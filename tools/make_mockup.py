@@ -105,14 +105,20 @@ def render(device, state):
     small, small_px = fonts["small"]
     clock_font, clock_px = fonts["numberMedium"]
 
-    draw_row(draw, centre_x, centre_y - int(height * 0.27), xtiny, xtiny_px,
+    # Mirror of the view: measure all five rows, total them, centre the block.
+    date_gap = (height * 9) // 100
+    stack = (xtiny_px + date_gap + clock_px + gap + small_px + gap
+             + tiny_px + gap + xtiny_px)
+    row_top = centre_y - stack // 2
+
+    draw_row(draw, centre_x, row_top + xtiny_px // 2, xtiny, xtiny_px,
              state["date"], COLOR_SECONDARY)
+    row_top += xtiny_px + date_gap
 
-    clock_centre = centre_y - int(height * 0.09)
-    draw_row(draw, centre_x, clock_centre, clock_font, clock_px,
+    draw_row(draw, centre_x, row_top + clock_px // 2, clock_font, clock_px,
              state["clock"], COLOR_PRIMARY)
+    row_top += clock_px + gap
 
-    row_top = clock_centre + clock_px // 2 + gap
     draw_row(draw, centre_x, row_top + small_px // 2, small, small_px,
              state["epoch"], state["accent"])
     row_top += small_px + gap

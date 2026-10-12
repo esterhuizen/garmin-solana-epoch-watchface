@@ -141,3 +141,51 @@ counts across runs:
 - The `.iq` package is not byte-reproducible between builds, because it carries per-build
   signatures. Observed 304,005 / 304,046 / 304,059 / 304,062 bytes across passes of identical
   source. The release `.prg` files are deterministic; three consecutive builds are byte-identical.
+
+## 7. Layout centring, fixed 2026-10-12 (v1.0.1)
+
+The mockup renderer was built to look at the composition, and it immediately found that the text
+block sat above centre on every screen. Measured as the bounding box of text ink inside the ring:
+
+| device | ink rows | block centre | screen centre | offset | empty above | empty below |
+|---|---|---|---|---|---|---|
+| fenix6 260 | 57..181 | 119 | 130 | -11 px | 57 px | 78 px |
+| fenix6s 240 | 53..170 | 112 | 120 | -8 px | 53 px | 69 px |
+| fenix6xpro 280 | 62..196 | 129 | 140 | -11 px | 62 px | 83 px |
+
+The cause was that the date and clock rows were pinned to fixed fractions of screen height
+(`0.27h` and `0.09h`) while the three rows below them were stacked from measured font heights. The
+fractions were chosen before the real font sizes were known, so the derived part of the stack ran
+shorter than the fractions assumed and the whole block ended up high, with a dead strip along the
+bottom.
+
+The fix removes screen fractions from the text layout entirely. All five row heights are measured
+with `getFontHeight()`, totalled with their gaps, and the block's top is derived so its centre is
+the screen centre. Re-measured after the change:
+
+| device | ink rows | offset | empty above | empty below |
+|---|---|---|---|---|
+| fenix6 260 | 67..192 | 0 px | 67 px | 67 px |
+| fenix6s 240 | 60..179 | 0 px | 60 px | 60 px |
+| fenix6xpro 280 | 72..208 | 0 px | 72 px | 71 px |
+
+This is a better fix than nudging the fractions, because the block now self-corrects if a device's
+real font metrics differ from the ones used here. That still matters: no hardware has confirmed
+them, and the vertical placement of the digits *inside* the clock row remains unverified.
+
+Release `.prg` grew from 13,436 to 13,500 bytes.
+
+## 8. Slot time keeps moving, which is the whole argument for self-calibration
+
+Measured from mainnet `getRecentPerformanceSamples` on this box, same method each time:
+
+| date | seconds per slot |
+|---|---|
+| 2026-09-18 | 0.3145 |
+| 2026-09-23 | 0.2632 |
+| 2026-10-12 | 0.2191 |
+
+That is a 30% change in 24 days, against a commonly cited "400 ms" figure that is now off by
+nearly a factor of two. A face with a hardcoded slot time would have drifted badly over a single
+epoch. The shipped 0.315 constant is only a first-cycle seed; everything after that is measured
+from the device's own consecutive observations.

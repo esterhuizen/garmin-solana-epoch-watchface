@@ -1,9 +1,10 @@
 //! Solana epoch watch face - the view.
 //!
 //! One layout for all three fenix 6 screen sizes (240, 260 and 280 px round). Nothing is
-//! hardcoded to a pixel count: every coordinate comes off dc.getWidth()/getHeight() and
-//! the lower three rows are stacked from measured font heights rather than screen
-//! fractions, so no assumed font metric can make two rows collide.
+//! hardcoded to a pixel count: every coordinate comes off dc.getWidth()/getHeight(), and
+//! all five text rows are measured with getFontHeight(), totalled, and centred as one
+//! block. So no assumed font metric can make two rows collide, and none can drag the
+//! block off centre either.
 //!
 //! There is no onPartialUpdate(). The countdown only needs minute resolution, onUpdate()
 //! already runs at the top of every minute in low-power mode on this always-on MIP
@@ -179,26 +180,43 @@ class SolanaEpochView extends WatchUi.WatchFace {
         dc.setPenWidth(1);
 
         // ---- Text stack -----------------------------------------------------------
-        // The date and clock rows stay anchored to screen fractions. Everything below
-        // the clock is stacked downward from the measured bottom of the clock row, so no
-        // assumed font metric can overlap two rows.
+        // Every row is measured, the five heights plus their gaps are totalled, and the
+        // whole block is centred on the screen. No row is anchored to a screen fraction
+        // any more. The previous version pinned the date and clock to fixed fractions of
+        // the height, which left the block sitting 8 to 11 px ABOVE centre on all three
+        // screen sizes, with a dead strip along the bottom (measured off the mockup
+        // renderer, tools/make_mockup.py). Deriving the top from the measured total fixes
+        // that, and it self-corrects if a device's real font metrics differ from the ones
+        // this was designed against - which matters, because no hardware has confirmed
+        // them.
         var clockInfo = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
 
-        drawRow(dc, centreX, centreY - (height * 0.27).toNumber(),
-            Graphics.FONT_XTINY, dateString(clockInfo), $.Se.COLOR_SECONDARY);
-
-        // FIRST THING TO CHECK ON REAL HARDWARE: the clock's vertical placement.
-        // FONT_NUMBER_* glyph boxes are reported to carry more padding above the ascent
-        // than getFontHeight() implies, so the digits may sit visibly low inside the row.
-        // If they do, nudge this fraction up; the stack below follows automatically.
-        var clockCentre = centreY - (height * 0.09).toNumber();
+        var dateHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
         var clockHeight = Graphics.getFontHeight(Graphics.FONT_NUMBER_MEDIUM);
-        drawRow(dc, centreX, clockCentre, Graphics.FONT_NUMBER_MEDIUM,
-            timeString(clockInfo), $.Se.COLOR_PRIMARY);
-
-        var rowTop = clockCentre + clockHeight / 2 + gap;
-
         var epochHeight = Graphics.getFontHeight(Graphics.FONT_SMALL);
+        var countdownHeight = Graphics.getFontHeight(Graphics.FONT_TINY);
+        var statusHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
+
+        // A wider gap under the date, so the clock reads as the primary row rather than
+        // as one of five evenly spaced lines. 23 px at 260, 21 at 240, 25 at 280.
+        var dateGap = (height * 9) / 100;
+
+        var stackHeight = dateHeight + dateGap + clockHeight + gap + epochHeight
+            + gap + countdownHeight + gap + statusHeight;
+        var rowTop = centreY - stackHeight / 2;
+
+        drawRow(dc, centreX, rowTop + dateHeight / 2, Graphics.FONT_XTINY,
+            dateString(clockInfo), $.Se.COLOR_SECONDARY);
+        rowTop += dateHeight + dateGap;
+
+        // FIRST THING TO CHECK ON REAL HARDWARE: where the digits sit INSIDE the clock
+        // row. FONT_NUMBER_* glyph boxes are reported to carry more padding above the
+        // ascent than getFontHeight() implies, so they may render low within the row.
+        // The row positions are derived now, so any correction stays local to this call.
+        drawRow(dc, centreX, rowTop + clockHeight / 2, Graphics.FONT_NUMBER_MEDIUM,
+            timeString(clockInfo), $.Se.COLOR_PRIMARY);
+        rowTop += clockHeight + gap;
+
         drawRow(dc, centreX, rowTop + epochHeight / 2, Graphics.FONT_SMALL,
             _haveData ? "EPOCH " + _epoch.format("%d") : "EPOCH --", _accent);
         rowTop += epochHeight + gap;
@@ -207,7 +225,6 @@ class SolanaEpochView extends WatchUi.WatchFace {
         if (_haveData) {
             countdown = rollover ? "rollover" : formatCountdown(secsLeft);
         }
-        var countdownHeight = Graphics.getFontHeight(Graphics.FONT_TINY);
         drawRow(dc, centreX, rowTop + countdownHeight / 2, Graphics.FONT_TINY,
             countdown, $.Se.COLOR_PRIMARY);
         rowTop += countdownHeight + gap;
@@ -230,7 +247,6 @@ class SolanaEpochView extends WatchUi.WatchFace {
         if (!System.getDeviceSettings().phoneConnected) {
             status += " x";
         }
-        var statusHeight = Graphics.getFontHeight(Graphics.FONT_XTINY);
         drawRow(dc, centreX, rowTop + statusHeight / 2, Graphics.FONT_XTINY,
             status, statusColor);
     }
